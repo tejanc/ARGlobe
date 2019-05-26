@@ -4,26 +4,26 @@ import android.net.Uri;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.view.MotionEvent;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
 import com.google.ar.core.Anchor;
-import com.google.ar.core.HitResult;
-import com.google.ar.core.Plane;
 import com.google.ar.sceneform.AnchorNode;
 import com.google.ar.sceneform.rendering.ModelRenderable;
 import com.google.ar.sceneform.ux.ArFragment;
-import com.google.ar.sceneform.ux.BaseArFragment;
 import com.google.ar.sceneform.ux.TransformableNode;
 
-import java.net.URI;
 
 public class MainActivity extends AppCompatActivity {
 
     private ArFragment arFragment;
-    Mode mode;
+    private TextView txt;
+    private Mode mode;
 
     enum Mode {
-        ADD_MODEL, DELETE_MODEL
+        ADD_FRAGMENT,
+        DELETE_FRAGMENT
     }
 
     @Override
@@ -31,40 +31,29 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        txt = findViewById(R.id.mode_text);
+
+        this.mode = Mode.ADD_FRAGMENT;
+
         arFragment = (ArFragment) getSupportFragmentManager().findFragmentById(R.id.arFragment);
 
+        //Add toggle mode feature and button listener
+        Button btn = findViewById(R.id.button_toggle);
+        btn.setOnClickListener(view -> toggleMode(view));
+
+        //Add ARPlane listener
         arFragment.setOnTapArPlaneListener((hitResult, plane, motionEvent) -> {
             Anchor anchor = hitResult.createAnchor();
 
-            Mode mode = Mode.ADD_MODEL;
-
             switch (mode) {
-                case ADD_MODEL:
-                    ModelRenderable.builder()
-                            .setSource(this, Uri.parse("ArcticFox_Posed.sfb"))
-                            .build()
-                            .thenAccept(modelRenderable -> addModelToScene(anchor, modelRenderable))
-                            .exceptionally(throwable -> {
-                                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                                builder.setMessage(throwable.getMessage())
-                                        .show();
-                                toggleMode();
-                                return null;
-                            });
+                case ADD_FRAGMENT:
+                    addItem(anchor);
                     break;
-                case DELETE_MODEL:
-                    ModelRenderable.builder()
-                            .setSource(this, Uri.parse("ArcticFox_Posed.sfb"))
-                            .build()
-                            .thenAccept(modelRenderable -> deleteModelToScene(anchor, modelRenderable))
-                            .exceptionally(throwable -> {
-                                AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                                builder.setMessage(throwable.getMessage())
-                                        .show();
-                                toggleMode();
-                                return null;
-                            });
+                case DELETE_FRAGMENT:
+                    deleteModelFromScene(anchor);
                     break;
+                default:
+                    addItem(anchor);
             }
 
         });
@@ -72,11 +61,22 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void toggleMode() {
-        if (mode == Mode.ADD_MODEL)
-            mode = Mode.DELETE_MODEL;
-        else
-            mode = Mode.ADD_MODEL;
+    public void toggleMode(View view) {
+        this.mode = mode == Mode.ADD_FRAGMENT ? Mode.DELETE_FRAGMENT : Mode.ADD_FRAGMENT;
+        txt.setText(mode.toString());
+    }
+
+    private void addItem(Anchor anchor) {
+        ModelRenderable.builder()
+                .setSource(this, Uri.parse("NOVELO_EARTH.sfb"))
+                .build()
+                .thenAccept(modelRenderable -> addModelToScene(anchor, modelRenderable))
+                .exceptionally(throwable -> {
+                    AlertDialog.Builder builder = new AlertDialog.Builder(this);
+                    builder.setMessage(throwable.getMessage())
+                            .show();
+                    return null;
+                });
     }
 
     private void addModelToScene(Anchor anchor, ModelRenderable modelRenderable) {
@@ -88,12 +88,11 @@ public class MainActivity extends AppCompatActivity {
         transformableNode.select();
     }
 
-    private void deleteModelToScene(Anchor anchor, ModelRenderable modelRenderable) {
-        AnchorNode anchorNode = new AnchorNode(anchor);
-        TransformableNode transformableNode = new TransformableNode(arFragment.getTransformationSystem());
-        transformableNode.setParent(anchorNode);
-        transformableNode.setRenderable(modelRenderable);
-        arFragment.getArSceneView().getScene().removeChild(anchorNode);
-        transformableNode.select();
+    private void deleteModelFromScene(Anchor anchor) {
+        TransformableNode node = new TransformableNode(arFragment.getTransformationSystem());
+        node.getScene().onRemoveChild(node.getParent());
+        node.setRenderable(null);
+        anchor.detach();
     }
+
 }
