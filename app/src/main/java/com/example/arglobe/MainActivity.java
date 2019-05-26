@@ -1,9 +1,11 @@
 package com.example.arglobe;
 
 import android.net.Uri;
+import android.os.SystemClock;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -20,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     private ArFragment arFragment;
     private TextView txt;
     private Mode mode;
+    private long mLastClickTime = 0;
 
     enum Mode {
         ADD_FRAGMENT,
@@ -43,6 +46,13 @@ public class MainActivity extends AppCompatActivity {
 
         //Add ARPlane listener
         arFragment.setOnTapArPlaneListener((hitResult, plane, motionEvent) -> {
+
+            // prevent multi-clicks, using threshold of 0.5 seconds
+            if ((SystemClock.elapsedRealtime() - mLastClickTime) < 500) {
+                return;
+            }
+            mLastClickTime = SystemClock.elapsedRealtime();
+
             Anchor anchor = hitResult.createAnchor();
 
             switch (mode) {
@@ -90,9 +100,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void deleteModelFromScene(Anchor anchor) {
         TransformableNode node = new TransformableNode(arFragment.getTransformationSystem());
-        node.getScene().onRemoveChild(node.getParent());
-        node.setRenderable(null);
-        anchor.detach();
+        if (node.getParent() != null) {
+            node.getScene().onRemoveChild(node.getParent());
+            node.setRenderable(null);
+            anchor.detach();
+        }
+        else {
+            Log.println(1, "Fatal","Cannot delete from scene. Child node does not have a parent.");
+        }
     }
 
 }
